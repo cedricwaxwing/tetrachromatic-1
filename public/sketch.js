@@ -167,49 +167,70 @@ function index(img, t, i) {
   return 4 * (t + i * img.width)
 }
 
+let origin;
 function dither(img) {
   img.loadPixels();
-  const offset1 = int(map(fxrand(), 0, 1, 1, 10));
-  const offset2 = offset1*2
   for (let x = 0; x < img.width - 1; x++)
       for (let y = 1; y < img.height - 1; y++) {
           let oldR = img.pixels[index(img, y, x)]
-            , oldG = img.pixels[index(img, y, x) + offset1]
-            , oldB = img.pixels[index(img, y, x) + offset2]
+            , oldG = img.pixels[index(img, y, x) + 1]
+            , oldB = img.pixels[index(img, y, x) + 2]
             , a = 1
             , newR = round(a * oldR / 255) * (255 / a)
             , newG = round(a * oldG / 255) * (255 / a)
-            , newB = round(a * oldB / 255) * (255 / a);
-
-          // diffMapList[0][3].map((dif, d)) {
-          //   // error 1
-          //   img.pixels[index(img, y + 1, x)] += 7 * (oldR - newR) / 16.0,
-          //   img.pixels[index(img, y + 1, x) + offset1] += fxrand()*2*7 * (oldG - newG) / 16.0,
-          //   img.pixels[index(img, y + 1, x) + offset2] += randOperation(7, (oldB - newB)) / 16.0,
-          // }
-          // error 0
-          img.pixels[index(img, y, x)] = newR,
-          img.pixels[index(img, y, x) + offset1] = newG,
-          img.pixels[index(img, y, x) + offset2] = newB,
-          // error 1
-          img.pixels[index(img, y + 1, x)] += 7 * (oldR - newR) / 16.0,
-          img.pixels[index(img, y + 1, x) + offset1] += fxrand()*2*7 * (oldG - newG) / 16.0,
-          img.pixels[index(img, y + 1, x) + offset2] += randOperation(7, (oldB - newB)) / 16.0,
-          // error 2
-          img.pixels[index(img, y - 1, x + 1)] += 3 * (oldR - newR) / 16.0,
-          img.pixels[index(img, y - 1, x + 1) + offset1] += fxrand()*2*3 * (oldG - newG) / 16.0,
-          img.pixels[index(img, y - 1, x + 1) + offset2] += randOperation(3, (oldB - newB)) / 16.0,
-          // error 3
-          img.pixels[index(img, y, x + 1)] += 5 * (oldR - newR) / 16.0,
-          img.pixels[index(img, y, x + 1) + offset1] += fxrand()*2*5 * (oldG - newG) / 16.0,
-          img.pixels[index(img, y, x + 1) + offset2] += randOperation(5, (oldB - newB)) / 16.0,
-          // error 4
-          img.pixels[index(img, y + 1, x + 1)] += 1 * (oldR - newR) / 16.0,
-          img.pixels[index(img, y + 1, x + 1) + offset1] += fxrand()*2*1 * (oldG - newG) / 16.0,
-          img.pixels[index(img, y + 1, x + 1) + offset2] += randOperation(1, (oldB - newB)) / 16.0
+            , newB = round(a * oldB / 255) * (255 / a)
+            , errR = oldR - newR
+            , errG = oldG - newG
+            , errB = oldB - newB;
+          
+          diffMapList[0][3].map((diffs, pixelRow) => {
+            mapDiffs(img, diffs, pixelRow, errR, errG, errB, x, y);
+          })
+          // // error 0
+          // img.pixels[index(img, y, x)] = newR,
+          // img.pixels[index(img, y, x) + 1] = newG,
+          // img.pixels[index(img, y, x) + 2] = newB,
+          // // error 1
+          // img.pixels[index(img, y + 1, x)] += 7 * (oldR - newR) / 16.0,
+          // img.pixels[index(img, y + 1, x) + 1] += fxrand()*2*7 * (oldG - newG) / 16.0,
+          // img.pixels[index(img, y + 1, x) + 2] += randOperation(7, (oldB - newB)) / 16.0,
+          // // error 2
+          // img.pixels[index(img, y - 1, x + 1)] += 3 * (oldR - newR) / 16.0,
+          // img.pixels[index(img, y - 1, x + 1) + 1] += fxrand()*2*3 * (oldG - newG) / 16.0,
+          // img.pixels[index(img, y - 1, x + 1) + 2] += randOperation(3, (oldB - newB)) / 16.0,
+          // // error 3
+          // img.pixels[index(img, y, x + 1)] += 5 * (oldR - newR) / 16.0,
+          // img.pixels[index(img, y, x + 1) + 1] += fxrand()*2*5 * (oldG - newG) / 16.0,
+          // img.pixels[index(img, y, x + 1) + 2] += randOperation(5, (oldB - newB)) / 16.0,
+          // // error 4
+          // img.pixels[index(img, y + 1, x + 1)] += 1 * (oldR - newR) / 16.0,
+          // img.pixels[index(img, y + 1, x + 1) + 1] += fxrand()*2*1 * (oldG - newG) / 16.0,
+          // img.pixels[index(img, y + 1, x + 1) + 2] += randOperation(1, (oldB - newB)) / 16.0
       }
   img.updatePixels()
 }
+
+function mapDiffs(img, diffs, pixelRow, errR, errG, errB, x, y) {
+  diffs.map((diff, pixelCol) => {
+
+    if(!origin && diff === "ø") { 
+      origin = [pixelCol, pixelRow];
+      mapDiffs(img, diffs, pixelRow, errR, errG, errB, x, y);
+    } else if(origin && diff !== "ø") {
+      const xOff = pixelCol - origin[0];
+      const yOff = pixelRow - origin[1];
+
+      // debug arena
+      if(x === 1 && y === 1) {
+        console.log(diff, xOff, yOff)
+      }
+
+      img.pixels[index(img, y + yOff, x + xOff) + 0] += diff * errR / 16.0,
+      img.pixels[index(img, y + yOff, x + xOff) + 1] += diff * errG / 16.0,
+      img.pixels[index(img, y + yOff, x + xOff) + 2] += diff * errB / 16.0;
+    }
+  })
+};
 
 function gradientMap(palette, img) {
   if(!img) {

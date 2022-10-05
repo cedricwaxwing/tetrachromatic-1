@@ -1,4 +1,4 @@
-const ø = -1;
+const ø = "ø";
 
 const diffMapList = [
   [
