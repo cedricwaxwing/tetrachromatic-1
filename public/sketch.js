@@ -7,6 +7,7 @@ let img1, img2, img3, img4, noise;
 let palette_seed, colors;
 let ditherOp, ditherOpIndex;
 let ditherOps = ["<<",">>","/","*","-","+","&&"];
+let diffType, quantizeFactor, x, y, ly, channelBitDepth;
 
 const canvasSize = 1500;
 
@@ -63,7 +64,7 @@ function preload() {
   // ----  SEEDS ---- //
 
   // Palette
-  palette_seed = int(map(fxrand(), 0, 1, 0, palettes.length-1))
+  palette_seed = 4 // int(map(fxrand(), 0, 1, 0, palettes.length-1))
   colors = palettes[palette_seed].colors
 
   // Images
@@ -71,31 +72,41 @@ function preload() {
   l2_seed = int(map(fxrand(), 0, 1, 1, assetAmounts.l2))
   l3_seed = int(map(fxrand(), 0, 1, 1, assetAmounts.l3))
   l4_seed = int(map(fxrand(), 0, 1, 1, assetAmounts.l4))
-  img1 = l1[l1_seed];
-  img2 = l2[l2_seed];
+  // img1 = l1[l1_seed];
+  // img2 = l2[l2_seed];
+  img1 = l1[3];
+  img2 = l2[7];
   img3 = l3[l3_seed];
   img4 = l4[l4_seed];
-  images = [img1, img2, img3, img4];
+  images = [
+    img1,
+    img2,
+    // img3,
+    // img4
+  ];
 
-  // Dither Operators
-  ditherOpIndex = int(map(fxrand(), 0, 1, 0, ditherOps.length))
+  // Dither
+  ditherOpIndex = int(map(fxrand(), 0, 1, 0, ditherOps.length-1))
+  diffType = "ATK" // int(map(fxrand(), 0, 1, 0, diffMapList.length-1))
+  channelBitDepth = 2;
 
   console.log({
     palette: palettes[palette_seed].name,
     images: [l1_seed, l2_seed, l3_seed, l4_seed],
     ditherOp: ditherOps[ditherOpIndex],
+    diffMapList: diffMapList,
   })
 }
 
-function getRandOp(a, b) {
+function randOperation(a, b) {
   switch (ditherOpIndex) {
-    case 0: ditherOp = a << b; break;
-    case 1: ditherOp = a >> b; break;
-    case 2: ditherOp = a / b; break;
-    case 3: ditherOp = a * b; break;
-    case 4: ditherOp = a - b; break;
-    case 5: ditherOp = a + b; break;
-    case 6: ditherOp = a && b; break;
+    case 0: return ditherOp = a << b;
+    case 1: return ditherOp = a >> b;
+    case 2: return ditherOp = a / b;
+    case 3: return ditherOp = a * b;
+    case 4: return ditherOp = a - b;
+    case 5: return ditherOp = a + b;
+    case 6: return ditherOp = a && b;
   }
 }
 
@@ -105,23 +116,51 @@ function setup() {
   background("green");
   createCanvas(canvasSize, canvasSize);
 
+  quantizeFactor = pow(2, channelBitDepth);
+  for (let i = 0; i < diffMapList.length; i++) {
+    if (diffType == diffMapList[i][0]) {
+      diffTypeName = diffMapList[i][1];
+      diffMap = diffMapList[i][2];
+      break;
+    }
+  }
 
+  if (diffMap == undefined) {
+    if (diffType == "") {
+      console.log(
+        "ERROR: \nA diffusion map wasn't specificed, so dithering was disabled."
+      );
+      diffTypeName = "N/A";
+      diffMap = null;
+    } else {
+      console.log(
+        "ERROR: \nThere was no diffusion map under the name '" +
+          diffType +
+          "', so the default was used instead."
+      );
+      diffTypeName = diffMapList[0][1];
+      diffMap = diffMapList[0][2];
+    }
+  }
+
+  x = 0;
+  y = 0;
+  ly = 0;
+
+
+  blendMode(OVERLAY);
   images.map((img, i) => {
     tint(255, map(i, 0, images.length-1, 60, 250));
     dither(img);
-    addContrast(150, img)
-    gradientMap(colors, img);
-    blendMode(i < images.length*.7 ? EXCLUSION : OVERLAY);
+    // addContrast(150, img)
+    // gradientMap(colors, img);
+    // blendMode(i < images.length*.7 ? EXCLUSION : OVERLAY);
     image(img, 0, 0, canvasSize, canvasSize);
   })
-  // tint(255,255);
-  // blendMode(BLEND)
-  // gradientMap(colors);
-  // image(get(), 0, 0, canvasSize, canvasSize);
 
-  blendMode(OVERLAY);
-  tint(255, 130);
-  addNoise();
+  // blendMode(OVERLAY);
+  // tint(255, 130);
+  // addNoise();
 }
 
 function index(img, t, i) {
@@ -130,35 +169,44 @@ function index(img, t, i) {
 
 function dither(img) {
   img.loadPixels();
-  for (let t = 0; t < img.width - 1; t++)
-      for (let i = 1; i < img.height - 1; i++) {
-          let r = img.pixels[index(img, i, t)]
-            , n = img.pixels[index(img, i, t) + 1]
-            , o = img.pixels[index(img, i, t) + 2]
+  const offset1 = int(map(fxrand(), 0, 1, 1, 10));
+  const offset2 = offset1*2
+  for (let x = 0; x < img.width - 1; x++)
+      for (let y = 1; y < img.height - 1; y++) {
+          let oldR = img.pixels[index(img, y, x)]
+            , oldG = img.pixels[index(img, y, x) + offset1]
+            , oldB = img.pixels[index(img, y, x) + offset2]
             , a = 1
-            , s = round(a * r / 255) * (255 / a)
-            , d = round(a * n / 255) * (255 / a)
-            , h = round(a * o / 255) * (255 / a);
+            , newR = round(a * oldR / 255) * (255 / a)
+            , newG = round(a * oldG / 255) * (255 / a)
+            , newB = round(a * oldB / 255) * (255 / a);
+
+          // diffMapList[0][3].map((dif, d)) {
+          //   // error 1
+          //   img.pixels[index(img, y + 1, x)] += 7 * (oldR - newR) / 16.0,
+          //   img.pixels[index(img, y + 1, x) + offset1] += fxrand()*2*7 * (oldG - newG) / 16.0,
+          //   img.pixels[index(img, y + 1, x) + offset2] += randOperation(7, (oldB - newB)) / 16.0,
+          // }
           // error 0
-          img.pixels[index(img, i, t)] = s,
-          img.pixels[index(img, i, t) + 1] = d,
-          img.pixels[index(img, i, t) + 2] = h,
+          img.pixels[index(img, y, x)] = newR,
+          img.pixels[index(img, y, x) + offset1] = newG,
+          img.pixels[index(img, y, x) + offset2] = newB,
           // error 1
-          img.pixels[index(img, i + 1, t)] += 7 * (r - s) / 16.0,
-          img.pixels[index(img, i + 1, t) + 1] += fxrand()*2*7 * (r - s) / 16.0,
-          img.pixels[index(img, i + 1, t) + 2] += getRandOp(7, (r - s)) / 16.0,
+          img.pixels[index(img, y + 1, x)] += 7 * (oldR - newR) / 16.0,
+          img.pixels[index(img, y + 1, x) + offset1] += fxrand()*2*7 * (oldG - newG) / 16.0,
+          img.pixels[index(img, y + 1, x) + offset2] += randOperation(7, (oldB - newB)) / 16.0,
           // error 2
-          img.pixels[index(img, i - 1, t + 1)] += 3 * (r - s) / 16.0,
-          img.pixels[index(img, i - 1, t + 1) + 1] += fxrand()*2*3 * (r - s) / 16.0,
-          img.pixels[index(img, i - 1, t + 1) + 2] += getRandOp(3, (r - s)) / 16.0,
+          img.pixels[index(img, y - 1, x + 1)] += 3 * (oldR - newR) / 16.0,
+          img.pixels[index(img, y - 1, x + 1) + offset1] += fxrand()*2*3 * (oldG - newG) / 16.0,
+          img.pixels[index(img, y - 1, x + 1) + offset2] += randOperation(3, (oldB - newB)) / 16.0,
           // error 3
-          img.pixels[index(img, i, t + 1)] += 5 * (r - s) / 16.0,
-          img.pixels[index(img, i, t + 1) + 1] += fxrand()*2*5 * (r - s) / 16.0,
-          img.pixels[index(img, i, t + 1) + 2] += getRandOp(5, (r - s)) / 16.0,
+          img.pixels[index(img, y, x + 1)] += 5 * (oldR - newR) / 16.0,
+          img.pixels[index(img, y, x + 1) + offset1] += fxrand()*2*5 * (oldG - newG) / 16.0,
+          img.pixels[index(img, y, x + 1) + offset2] += randOperation(5, (oldB - newB)) / 16.0,
           // error 4
-          img.pixels[index(img, i + 1, t + 1)] += 1 * (r - s) / 16.0,
-          img.pixels[index(img, i + 1, t + 1) + 1] += fxrand()*2*1 * (r - s) / 16.0,
-          img.pixels[index(img, i + 1, t + 1) + 2] += getRandOp(1, (r - s)) / 16.0
+          img.pixels[index(img, y + 1, x + 1)] += 1 * (oldR - newR) / 16.0,
+          img.pixels[index(img, y + 1, x + 1) + offset1] += fxrand()*2*1 * (oldG - newG) / 16.0,
+          img.pixels[index(img, y + 1, x + 1) + offset2] += randOperation(1, (oldB - newB)) / 16.0
       }
   img.updatePixels()
 }
