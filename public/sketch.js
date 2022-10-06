@@ -1,3 +1,6 @@
+let seed1 = fxrand();
+let seed2 = fxrand();
+let seed3 = fxrand();
 let l1 = [];
 let l2 = [];
 let l3 = [];
@@ -5,7 +8,8 @@ let l4 = [];
 let images = [];
 let img1, img2, img3, img4, noise;
 let palette_seed, colors;
-let ditherOp, ditherOpIndex;
+let ditherOp, ditherOpIndex, errorType, errorMappedVals;
+let errorTypes = 4;
 let ditherOps = [
   "<<",
   ">>",
@@ -81,14 +85,14 @@ function preload() {
   // ----  SEEDS ---- //
 
   // Palette
-  palette_seed = int(map(fxrand(), 0, 1, 0, palettes.length-1))
+  palette_seed = int(map(seed2, 0, 1, 0, palettes.length-1))
   colors = palettes[palette_seed].colors
 
   // Images
-  l1_seed = int(map(fxrand(), 0, 1, 1, assetAmounts.l1))
-  l2_seed = int(map(fxrand(), 0, 1, 1, assetAmounts.l2))
-  l3_seed = int(map(fxrand(), 0, 1, 1, assetAmounts.l3))
-  l4_seed = int(map(fxrand(), 0, 1, 1, assetAmounts.l4))
+  l1_seed = int(map(seed1, 0, 1, 1, assetAmounts.l1))
+  l2_seed = int(map(seed1, 0, 1, 1, assetAmounts.l2))
+  l3_seed = int(map(seed1, 0, 1, 1, assetAmounts.l3))
+  l4_seed = int(map(seed1, 0, 1, 1, assetAmounts.l4))
   img1 = l1[l1_seed];
   img2 = l2[l2_seed];
   img3 = l3[l3_seed];
@@ -99,18 +103,26 @@ function preload() {
     img3,
     img4
   ];
-  imageSize = map(fxrand(), 0, 1, canvasSize, canvasSize*1.1)
+  imageSize = map(seed1, 0, 1, canvasSize, canvasSize*1.1)
 
   // Dither
-  ditherOpIndex = int(map(fxrand(), 0, 1, 0, ditherOps.length))
-  cOff1 = fxrand();
+  ditherOpIndex = round(map(seed1, 0, 1, 0, ditherOps.length))
+  cOff1 = seed1;
   cOff2 = cOff1*2
+  errorType = round(map(seed1, 0, 1, 0, errorTypes-1));
+  errorMappedVals = {
+    "3-1": map(seed2, 0, 1, 0, 3),
+    "3-2": map(seed3, 0, 1, 16, 48),
+  }
 
   console.log({
     palette: palettes[palette_seed].name,
     images: [l1_seed, l2_seed, l3_seed, l4_seed],
     ditherOp: ditherOps[ditherOpIndex],
-    diffMapList: diffMapList,
+    errorType: errorType,
+    seed1: seed1,
+    seed2: seed2,
+    seed3: seed3,
   })
 }
 
@@ -132,73 +144,123 @@ function setup() {
   background("white");
   createCanvas(canvasSize, canvasSize);
 
-  blendMode(OVERLAY);
   images.map((img, i) => {
-    tint(255, map(i, 0, images.length-1, 60, 350));
-    dither(img);
-    addContrast(250, img)
+    // addThresholdTexture(img);
+    dither(img, 1, i % 2 ? 3 : 2);
+    addContrast(180, img)
     gradientMap(colors, img);
-    blendMode(i < images.length*.2 ? EXCLUSION : BURN);
+    if(i !== 0) {
+      // blendMode(i < images.length % 2 ? EXCLUSION : OVERLAY);
+      blendMode(OVERLAY);
+    }
+    tint(255, map(i, 0, images.length-1, 160, 220));
     image(img, 0, 0, canvasSize, canvasSize);
   })
 
-  blendMode(OVERLAY);
-  tint(255, 130);
   addNoise();
 }
 
-function index(img, t, i) {
-  return 4 * (t + i * img.width)
+function imageIndex(img, x, y) {
+  return 4 * (x + y * img.width);
 }
 
-let origin;
-function dither(img) {
+function getColorAtindex(img, x, y) {
+  let idx = imageIndex(img, x, y);
+  let pix = img.pixels;
+  let red = pix[idx];
+  let green = pix[idx + 1];
+  let blue = pix[idx + 2];
+  let alpha = pix[idx + 3];
+  return color(red, green, blue, alpha);
+}
+
+function setColorAtIndex(img, x, y, clr) {
+  let idx = imageIndex(img, x, y);
+
+  let pix = img.pixels;
+  pix[idx] = red(clr);
+  pix[idx + 1] = green(clr);
+  pix[idx + 2] = blue(clr);
+  pix[idx + 3] = alpha(clr);
+}
+
+// Finds the closest step for a given value
+// The step 0 is always included, so the number of steps
+// is actually steps + 1
+function closestStep(max, steps, value) {
+  return round(steps * value / 255) * floor(255 / steps);
+}
+
+function dither(img, steps, errType) {
   img.loadPixels();
-  for (let x = 0; x < img.width - 1; x++)
-      for (let y = 1; y < img.height - 1; y++) {
-          let oldR = img.pixels[index(img, y, x)]
-            , oldG = img.pixels[index(img, y, x) + 1]
-            , oldB = img.pixels[index(img, y, x) + 2]
-            , newR = posterize(oldR, diffMapList[0][2])
-            , newG = posterize(oldG, diffMapList[0][2])
-            , newB = posterize(oldB, diffMapList[0][2])
-            , errR = oldR - newR
-            , errG = oldG - newG
-            , errB = oldB - newB;
-          
-          diffMapList[0][3].map((diffs, pixelRow) => {
-            mapDiffs(img, diffs, pixelRow, errR, errG, errB, x, y);
-          })
-      }
-  img.updatePixels()
+
+  for (let y = 0; y < img.height; y++) {
+    for (let x = 0; x < img.width; x++) {
+      let clr = getColorAtindex(img, x, y);
+      let oldR = red(clr);
+      let oldG = green(clr);
+      let oldB = blue(clr);
+      let newR = closestStep(255, steps, oldR);
+      let newG = closestStep(255, steps, oldG);
+      let newB = closestStep(255, steps, oldB);
+
+      let newClr = color(newR, newG, newB);
+      setColorAtIndex(img, x, y, newClr);
+
+      let errR = oldR - newR;
+      let errG = oldG - newG;
+      let errB = oldB - newB;
+
+      distributeError(img, x, y, errR, errG, errB, errType);
+    }
+  }
+
+  img.updatePixels();
 }
 
-function mapDiffs(img, diffs, pixelRow, errR, errG, errB, x, y) {
-  diffs.map((diff, pixelCol) => {
+function distributeError(img, x, y, errR, errG, errB, errType) {
+  if (errType) {
+    errorType = errType;
+  }
 
-    if(!origin && diff === "ø") { 
-      origin = [pixelCol, pixelRow];
-      mapDiffs(img, diffs, pixelRow, errR, errG, errB, x, y);
-    } else if(origin && diff !== "ø") {
-      const xOff = pixelCol - origin[0];
-      const yOff = pixelRow - origin[1];
+  switch (errorType) {
+    case 0:
+      addError(img, 7 / 16.0, x + 1, y, errR, errG, errB);
+      addError(img, 3 / 16.0, x - 1, y + 1, errR, errG, errB);
+      addError(img, 5 / 16.0, x, y + 1, errR, errG, errB);
+      addError(img, 1 / 16.0, x + 1, y + 1, errR, errG, errB);
+    case 1: 
+      addError(img, 16.0, x + 1, y, errR, errG, errB);
+      addError(img, 17.0, x - 1, y + 1, errR, errG, errB);
+      addError(img, 13.0 , x, y + 1, errR, errG, errB);
+      addError(img, 0.1 / 16.0, x + 1, y + 1, errR, errG, errB);
+    case 2: 
+      addError(img, 1 / 16.0, x + 145, y, errR, errG, errB);
+      addError(img, randOperation(7, 16), x - 1, y + 1, errR, errG, errB);
+      addError(img, 22.0 , x, y + 1, errR, errG, errB);
+      addError(img, 0.1 / 16.0, x + 1, y + 1, errR, errG, errB);
+    case 3: 
+      addError(img, 1 / 16.0, x, y + errorMappedVals["3-1"], errR, errG, errB);
+      addError(img, 7 / 16.0, x - 1, y + 145, errR, errG, errB);
+      addError(img, randOperation(errorMappedVals["3-2"], 16) , x, y + 1, errR, errG, errB);
+      addError(img, 0.1 / 16.0, x + 1, y + 3, errR, errG, errB);
+  }
+}
 
-      // // debug arena
-      // if(x === 1 && y === 1) {
-      //   console.log(diff, xOff, yOff)
-      //   console.log(42 >> 16)
-      // }
+function addError(img, factor, x, y, errR, errG, errB) {
+  if (x < 0 || x >= img.width || y < 0 || y >= img.height) return;
+  let clr = getColorAtindex(img, x, y);
+  let r = red(clr);
+  let g = green(clr);
+  let b = blue(clr);
+  r += -1.5;
+  b += .5;
+  g += 3;
+  clr.setRed(r + errR * factor);
+  clr.setGreen(g + errG * factor);
+  clr.setBlue(b + errB * factor);
 
-      img.pixels[index(img, y + yOff, x + xOff) + 0] += diff << errR * fxrand()*2 / 16.0,
-      img.pixels[randOperation(index(img, y + yOff, x + xOff), cOff1)] += diff << errG / 16.0,
-      img.pixels[randOperation(index(img, y + yOff, x + xOff), cOff2)] += diff << errB * fxrand()*2 / 16.0;
-    }
-  })
-};
-
-function posterize(value, channelBitDepth) {
-  quantizeFactor = pow(2, channelBitDepth);
-  return round(value / 255) * 255
+  setColorAtIndex(img, x, y, clr);
 }
 
 function gradientMap(palette, img) {
@@ -247,13 +309,21 @@ function addContrast(contrast, img) {
   img.updatePixels();
 }
 
+function addThresholdTexture(img) {
+  const ths = createGraphics(canvasSize, canvasSize);
+  ths.pixelDensity(1);
+  ths.image(img, 0, 0, canvasSize, canvasSize);
+  ths.filter(THRESHOLD, 0.1);
+  image(ths, 0, 0, canvasSize);
+}
+
 function addNoise() {
   noiseGfx = createGraphics(canvasSize, canvasSize);
   noiseGfx.pixelDensity(1);
   noiseGfx.image(noise, 0, 0, canvasSize, canvasSize)
-  // dither(noiseGfx)
+  dither(noiseGfx, 1, 0)
   gradientMap(colors, noiseGfx)
-  tint(255, map(fxrand(), 0, 1, 70, 150));
+  tint(255, map(seed3, 0, 1, 110, 180));
   blendMode(HARD_LIGHT);
   image(noiseGfx, 0, 0, canvasSize, canvasSize)
 }
