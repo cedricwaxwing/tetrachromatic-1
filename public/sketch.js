@@ -18,6 +18,7 @@ let ditherOps = [
 let cOff1, cOff2;
 
 const canvasSize = 1500;
+let imageSize;
 
 const assetAmounts = {
   l1: 7,
@@ -29,7 +30,7 @@ const assetAmounts = {
 const palettes = [
   // 0
   { name: "photosynthesis",
-    colors: [[6,62,14], [0,255,234], [17,190,94], [169,245,108], [240,255,0], [249,255,157]],
+    colors: [[6,62,14], [17,94,54], [64,154,105], [0,200,160], [240,255,0], [249,255,157]],
   },
   // 1
   { name: "bioluminescence",
@@ -40,7 +41,7 @@ const palettes = [
     colors: [[12,71,103],[86,110,61],[250,121,33],[254,153,32],[185,164,76]],
   },
   // 3
-  { name: "morning sun",
+  { name: "lascaux",
     colors: [[63,94,97], [111,54,36], [229,177,129], [244,185,178], [218,237,189]],
   },
   // 4
@@ -50,6 +51,14 @@ const palettes = [
   // 5
   { name: "autumn rain",
     colors: [[61,123,123],[117,72,94],[203,144,77],[223,204,116],[195,233,145]],
+  },
+  // 6
+  { name: "neopolitan",
+    colors: [[54,55,50],[102,195,255],[83,216,251],[212,175,185],[220,225,233]],
+  },
+  // 7
+  { name: "dusk",
+    colors: [[14,17,22],[55,74,103],[97,98,131],[158,123,155],[203,156,242]],
   },
 ]
 
@@ -90,10 +99,11 @@ function preload() {
     img3,
     img4
   ];
+  imageSize = map(fxrand(), 0, 1, canvasSize, canvasSize*1.1)
 
   // Dither
   ditherOpIndex = int(map(fxrand(), 0, 1, 0, ditherOps.length))
-  cOff1 = fxrand()*width*2;
+  cOff1 = fxrand();
   cOff2 = cOff1*2
 
   console.log({
@@ -119,7 +129,7 @@ function randOperation(a, b) {
 function setup() {
   pixelDensity(2);
   colorMode(RGB)
-  background("green");
+  background("white");
   createCanvas(canvasSize, canvasSize);
 
   blendMode(OVERLAY);
@@ -194,6 +204,7 @@ function posterize(value, channelBitDepth) {
 function gradientMap(palette, img) {
   if(!img) {
     img = get();
+    image(get(), 0, 0);
   }
   img.loadPixels();
   for (let x = 0; x < img.width; x +=1) {
@@ -240,9 +251,11 @@ function addNoise() {
   noiseGfx = createGraphics(canvasSize, canvasSize);
   noiseGfx.pixelDensity(1);
   noiseGfx.image(noise, 0, 0, canvasSize, canvasSize)
-  dither(noiseGfx)
-  image(noiseGfx, 0, 0, canvasSize, canvasSize)
+  // dither(noiseGfx)
   gradientMap(colors, noiseGfx)
+  tint(255, map(fxrand(), 0, 1, 70, 150));
+  blendMode(HARD_LIGHT);
+  image(noiseGfx, 0, 0, canvasSize, canvasSize)
 }
 
 function keyPressed(){
