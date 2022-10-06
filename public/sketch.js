@@ -6,8 +6,16 @@ let images = [];
 let img1, img2, img3, img4, noise;
 let palette_seed, colors;
 let ditherOp, ditherOpIndex;
-let ditherOps = ["<<",">>","/","*","-","+","&&"];
-let diffType, quantizeFactor, x, y, ly, channelBitDepth;
+let ditherOps = [
+  "<<",
+  ">>",
+  "/",
+  "*",
+  "-",
+  "+",
+  "&&"
+];
+let cOff1, cOff2;
 
 const canvasSize = 1500;
 
@@ -64,7 +72,7 @@ function preload() {
   // ----  SEEDS ---- //
 
   // Palette
-  palette_seed = 4 // int(map(fxrand(), 0, 1, 0, palettes.length-1))
+  palette_seed = int(map(fxrand(), 0, 1, 0, palettes.length-1))
   colors = palettes[palette_seed].colors
 
   // Images
@@ -72,23 +80,21 @@ function preload() {
   l2_seed = int(map(fxrand(), 0, 1, 1, assetAmounts.l2))
   l3_seed = int(map(fxrand(), 0, 1, 1, assetAmounts.l3))
   l4_seed = int(map(fxrand(), 0, 1, 1, assetAmounts.l4))
-  // img1 = l1[l1_seed];
-  // img2 = l2[l2_seed];
-  img1 = l1[3];
-  img2 = l2[7];
+  img1 = l1[l1_seed];
+  img2 = l2[l2_seed];
   img3 = l3[l3_seed];
   img4 = l4[l4_seed];
   images = [
     img1,
     img2,
-    // img3,
-    // img4
+    img3,
+    img4
   ];
 
   // Dither
-  ditherOpIndex = int(map(fxrand(), 0, 1, 0, ditherOps.length-1))
-  diffType = "ATK" // int(map(fxrand(), 0, 1, 0, diffMapList.length-1))
-  channelBitDepth = 2;
+  ditherOpIndex = int(map(fxrand(), 0, 1, 0, ditherOps.length))
+  cOff1 = fxrand()*width*2;
+  cOff2 = cOff1*2
 
   console.log({
     palette: palettes[palette_seed].name,
@@ -116,51 +122,19 @@ function setup() {
   background("green");
   createCanvas(canvasSize, canvasSize);
 
-  quantizeFactor = pow(2, channelBitDepth);
-  for (let i = 0; i < diffMapList.length; i++) {
-    if (diffType == diffMapList[i][0]) {
-      diffTypeName = diffMapList[i][1];
-      diffMap = diffMapList[i][2];
-      break;
-    }
-  }
-
-  if (diffMap == undefined) {
-    if (diffType == "") {
-      console.log(
-        "ERROR: \nA diffusion map wasn't specificed, so dithering was disabled."
-      );
-      diffTypeName = "N/A";
-      diffMap = null;
-    } else {
-      console.log(
-        "ERROR: \nThere was no diffusion map under the name '" +
-          diffType +
-          "', so the default was used instead."
-      );
-      diffTypeName = diffMapList[0][1];
-      diffMap = diffMapList[0][2];
-    }
-  }
-
-  x = 0;
-  y = 0;
-  ly = 0;
-
-
   blendMode(OVERLAY);
   images.map((img, i) => {
-    tint(255, map(i, 0, images.length-1, 60, 250));
+    tint(255, map(i, 0, images.length-1, 60, 350));
     dither(img);
-    // addContrast(150, img)
-    // gradientMap(colors, img);
-    // blendMode(i < images.length*.7 ? EXCLUSION : OVERLAY);
+    addContrast(250, img)
+    gradientMap(colors, img);
+    blendMode(i < images.length*.2 ? EXCLUSION : BURN);
     image(img, 0, 0, canvasSize, canvasSize);
   })
 
-  // blendMode(OVERLAY);
-  // tint(255, 130);
-  // addNoise();
+  blendMode(OVERLAY);
+  tint(255, 130);
+  addNoise();
 }
 
 function index(img, t, i) {
@@ -175,10 +149,9 @@ function dither(img) {
           let oldR = img.pixels[index(img, y, x)]
             , oldG = img.pixels[index(img, y, x) + 1]
             , oldB = img.pixels[index(img, y, x) + 2]
-            , a = 1
-            , newR = round(a * oldR / 255) * (255 / a)
-            , newG = round(a * oldG / 255) * (255 / a)
-            , newB = round(a * oldB / 255) * (255 / a)
+            , newR = posterize(oldR, diffMapList[0][2])
+            , newG = posterize(oldG, diffMapList[0][2])
+            , newB = posterize(oldB, diffMapList[0][2])
             , errR = oldR - newR
             , errG = oldG - newG
             , errB = oldB - newB;
@@ -186,26 +159,6 @@ function dither(img) {
           diffMapList[0][3].map((diffs, pixelRow) => {
             mapDiffs(img, diffs, pixelRow, errR, errG, errB, x, y);
           })
-          // // error 0
-          // img.pixels[index(img, y, x)] = newR,
-          // img.pixels[index(img, y, x) + 1] = newG,
-          // img.pixels[index(img, y, x) + 2] = newB,
-          // // error 1
-          // img.pixels[index(img, y + 1, x)] += 7 * (oldR - newR) / 16.0,
-          // img.pixels[index(img, y + 1, x) + 1] += fxrand()*2*7 * (oldG - newG) / 16.0,
-          // img.pixels[index(img, y + 1, x) + 2] += randOperation(7, (oldB - newB)) / 16.0,
-          // // error 2
-          // img.pixels[index(img, y - 1, x + 1)] += 3 * (oldR - newR) / 16.0,
-          // img.pixels[index(img, y - 1, x + 1) + 1] += fxrand()*2*3 * (oldG - newG) / 16.0,
-          // img.pixels[index(img, y - 1, x + 1) + 2] += randOperation(3, (oldB - newB)) / 16.0,
-          // // error 3
-          // img.pixels[index(img, y, x + 1)] += 5 * (oldR - newR) / 16.0,
-          // img.pixels[index(img, y, x + 1) + 1] += fxrand()*2*5 * (oldG - newG) / 16.0,
-          // img.pixels[index(img, y, x + 1) + 2] += randOperation(5, (oldB - newB)) / 16.0,
-          // // error 4
-          // img.pixels[index(img, y + 1, x + 1)] += 1 * (oldR - newR) / 16.0,
-          // img.pixels[index(img, y + 1, x + 1) + 1] += fxrand()*2*1 * (oldG - newG) / 16.0,
-          // img.pixels[index(img, y + 1, x + 1) + 2] += randOperation(1, (oldB - newB)) / 16.0
       }
   img.updatePixels()
 }
@@ -220,17 +173,23 @@ function mapDiffs(img, diffs, pixelRow, errR, errG, errB, x, y) {
       const xOff = pixelCol - origin[0];
       const yOff = pixelRow - origin[1];
 
-      // debug arena
-      if(x === 1 && y === 1) {
-        console.log(diff, xOff, yOff)
-      }
+      // // debug arena
+      // if(x === 1 && y === 1) {
+      //   console.log(diff, xOff, yOff)
+      //   console.log(42 >> 16)
+      // }
 
-      img.pixels[index(img, y + yOff, x + xOff) + 0] += diff * errR / 16.0,
-      img.pixels[index(img, y + yOff, x + xOff) + 1] += diff * errG / 16.0,
-      img.pixels[index(img, y + yOff, x + xOff) + 2] += diff * errB / 16.0;
+      img.pixels[index(img, y + yOff, x + xOff) + 0] += diff << errR * fxrand()*2 / 16.0,
+      img.pixels[randOperation(index(img, y + yOff, x + xOff), cOff1)] += diff << errG / 16.0,
+      img.pixels[randOperation(index(img, y + yOff, x + xOff), cOff2)] += diff << errB * fxrand()*2 / 16.0;
     }
   })
 };
+
+function posterize(value, channelBitDepth) {
+  quantizeFactor = pow(2, channelBitDepth);
+  return round(value / 255) * 255
+}
 
 function gradientMap(palette, img) {
   if(!img) {
@@ -284,4 +243,10 @@ function addNoise() {
   dither(noiseGfx)
   image(noiseGfx, 0, 0, canvasSize, canvasSize)
   gradientMap(colors, noiseGfx)
+}
+
+function keyPressed(){
+  if (key === 's'){
+    saveCanvas(`${fxhash}.jpg`);
+  }
 }
