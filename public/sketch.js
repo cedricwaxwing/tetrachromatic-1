@@ -13,13 +13,12 @@ let palette_seed, colors;
 let ditherOp, ditherOpIndex, errorType, errorMappedVals;
 let errorTypes = 5;
 let ditherOps = [
+  "*",
+  "/",
   "<<",
   ">>",
-  "/",
-  "*",
-  "-",
-  "+",
-  "&&"
+  "&&",
+  "||"
 ];
 let cOff1, cOff2;
 
@@ -27,11 +26,10 @@ const canvasSize = 1500;
 let imageSize;
 
 const assetAmounts = {
-  l1: 7,
+  l1: 12,
   l2: 18,
   l3: 18,
-  l4: 3,
-  noise: 3,
+  noise: 2,
 }
 
 const palettes = [
@@ -80,9 +78,6 @@ function preload() {
   for (i = 1; i <= assetAmounts.l3; i++) {
     l3[i] = loadImage(`gan/3/${i}.jpeg`)
   }
-  for (i = 1; i <= assetAmounts.l4; i++) {
-    l4[i] = loadImage(`gan/plants/${i}.jpeg`)
-  }
   for (i = 1; i <= assetAmounts.noise; i++) {
     noise[i] = loadImage(`noise/${i}.png`)
   }
@@ -97,18 +92,15 @@ function preload() {
   l1_seed = round(map(seed1, 0, 1, 1, assetAmounts.l1))
   l2_seed = round(map(seed2, 0, 1, 1, assetAmounts.l2))
   l3_seed = round(map(seed3, 0, 1, 1, assetAmounts.l3))
-  l4_seed = round(map(seed4, 0, 1, 1, assetAmounts.l4))
   noise_seed = round(map(seed2, 0, 1, 1, assetAmounts.noise))
   img1 = l1[l1_seed];
   img2 = l2[l2_seed];
   img3 = l3[l3_seed];
-  img4 = l4[l4_seed];
   imgNoise = noise[2];
   images = [
     img1,
     img2,
     img3,
-    // img4,
   ];
   imageSize = map(seed1, 0, 1, canvasSize, canvasSize*1.4)
 
@@ -123,16 +115,16 @@ function preload() {
     "3-2": map(seed3, 0, 1, 16, 48),
   }
 
-  console.log({
-    palette: palettes[palette_seed].name,
-    images: [l1_seed, l2_seed, l3_seed, l4_seed],
-    ditherOp: ditherOps[ditherOpIndex],
-    errorType: errorType,
-    seed1: seed1,
-    seed2: seed2,
-    seed3: seed3,
-    seed4: seed4,
-  })
+  const fxhashFeatures = {
+    "Palette": palettes[palette_seed].name,
+    "Dither": `•§• •${ditherOps[ditherOpIndex]}• --- •${errorType}• •¶•`,
+    "Bio": l1_seed,
+    "Glyptik": l2_seed,
+    "Ortho": l3_seed,
+  }
+  window.$fxhashFeatures = fxhashFeatures;
+
+  console.log(fxhashFeatures)
 }
 
 function setup() {
@@ -145,19 +137,20 @@ function setup() {
     if(i > 0) {
       dither(img, 1, round(map(fxrand(), 0, 1, 0, errorTypes)));
     }
-    addContrast(180, img)
+    addContrast(230, img)
     if(i <= images.length-2) {
       gradientMap(colors, img);
     }
-    if(i !== 0) {
+    if(i > 0) {
       blendMode(i < images.length % 2 ? EXCLUSION : OVERLAY);
-      // blendMode(OVERLAY);
     }
     tint(255, map(i, 0, images.length, 120, 180));
     image(img, 0, 0, imageSize, imageSize);
   })
   
+  addContrast(40);
   addNoise();
+  fxpreview();
 }
 
 function imageIndex(img, x, y) {
