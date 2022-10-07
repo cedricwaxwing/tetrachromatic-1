@@ -1,15 +1,17 @@
 let seed1 = fxrand();
 let seed2 = fxrand();
 let seed3 = fxrand();
+let seed4 = fxrand();
 let l1 = [];
 let l2 = [];
 let l3 = [];
 let l4 = [];
+let noise = [];
 let images = [];
-let img1, img2, img3, img4, noise;
+let img1, img2, img3, img4, imgNoise;
 let palette_seed, colors;
 let ditherOp, ditherOpIndex, errorType, errorMappedVals;
-let errorTypes = 4;
+let errorTypes = 5;
 let ditherOps = [
   "<<",
   ">>",
@@ -26,15 +28,16 @@ let imageSize;
 
 const assetAmounts = {
   l1: 7,
-  l2: 8,
-  l3: 5,
+  l2: 18,
+  l3: 18,
   l4: 3,
+  noise: 3,
 }
 
 const palettes = [
   // 0
   { name: "photosynthesis",
-    colors: [[6,62,14], [17,94,54], [64,154,105], [0,200,160], [240,255,0], [249,255,157]],
+    colors: [[12,102,28], [24,135,87], [64,154,125], [0,200,160], [240,255,0], [249,255,157]],
   },
   // 1
   { name: "bioluminescence",
@@ -58,7 +61,7 @@ const palettes = [
   },
   // 6
   { name: "neopolitan",
-    colors: [[54,55,50],[102,195,255],[83,216,251],[212,175,185],[220,225,233]],
+    colors: [[54,55,50],[37,78,126],[193,94,117],[123,212,223],[220,225,233]],
   },
   // 7
   { name: "dusk",
@@ -80,7 +83,9 @@ function preload() {
   for (i = 1; i <= assetAmounts.l4; i++) {
     l4[i] = loadImage(`gan/plants/${i}.jpeg`)
   }
-  noise = loadImage(`noise.png`);
+  for (i = 1; i <= assetAmounts.noise; i++) {
+    noise[i] = loadImage(`noise/${i}.png`)
+  }
   
   // ----  SEEDS ---- //
 
@@ -89,21 +94,23 @@ function preload() {
   colors = palettes[palette_seed].colors
 
   // Images
-  l1_seed = int(map(seed1, 0, 1, 1, assetAmounts.l1))
-  l2_seed = int(map(seed1, 0, 1, 1, assetAmounts.l2))
-  l3_seed = int(map(seed1, 0, 1, 1, assetAmounts.l3))
-  l4_seed = int(map(seed1, 0, 1, 1, assetAmounts.l4))
+  l1_seed = round(map(seed1, 0, 1, 1, assetAmounts.l1))
+  l2_seed = round(map(seed2, 0, 1, 1, assetAmounts.l2))
+  l3_seed = round(map(seed3, 0, 1, 1, assetAmounts.l3))
+  l4_seed = round(map(seed4, 0, 1, 1, assetAmounts.l4))
+  noise_seed = round(map(seed2, 0, 1, 1, assetAmounts.noise))
   img1 = l1[l1_seed];
   img2 = l2[l2_seed];
   img3 = l3[l3_seed];
   img4 = l4[l4_seed];
+  imgNoise = noise[2];
   images = [
     img1,
     img2,
     img3,
-    img4
+    // img4,
   ];
-  imageSize = map(seed1, 0, 1, canvasSize, canvasSize*1.1)
+  imageSize = map(seed1, 0, 1, canvasSize, canvasSize*1.4)
 
   // Dither
   ditherOpIndex = round(map(seed1, 0, 1, 0, ditherOps.length))
@@ -111,6 +118,7 @@ function preload() {
   cOff2 = cOff1*2
   errorType = round(map(seed1, 0, 1, 0, errorTypes-1));
   errorMappedVals = {
+    "set-1":  map(seed1, 0, 1, 1, 100),
     "3-1": map(seed2, 0, 1, 0, 3),
     "3-2": map(seed3, 0, 1, 16, 48),
   }
@@ -123,19 +131,8 @@ function preload() {
     seed1: seed1,
     seed2: seed2,
     seed3: seed3,
+    seed4: seed4,
   })
-}
-
-function randOperation(a, b) {
-  switch (ditherOpIndex) {
-    case 0: return ditherOp = a << b;
-    case 1: return ditherOp = a >> b;
-    case 2: return ditherOp = a / b;
-    case 3: return ditherOp = a * b;
-    case 4: return ditherOp = a - b;
-    case 5: return ditherOp = a + b;
-    case 6: return ditherOp = a && b;
-  }
 }
 
 function setup() {
@@ -145,18 +142,21 @@ function setup() {
   createCanvas(canvasSize, canvasSize);
 
   images.map((img, i) => {
-    // addThresholdTexture(img);
-    dither(img, 1, i % 2 ? 3 : 2);
-    addContrast(180, img)
-    gradientMap(colors, img);
-    if(i !== 0) {
-      // blendMode(i < images.length % 2 ? EXCLUSION : OVERLAY);
-      blendMode(OVERLAY);
+    if(i > 0) {
+      dither(img, 1, round(map(fxrand(), 0, 1, 0, errorTypes)));
     }
-    tint(255, map(i, 0, images.length-1, 160, 220));
-    image(img, 0, 0, canvasSize, canvasSize);
+    addContrast(180, img)
+    if(i <= images.length-2) {
+      gradientMap(colors, img);
+    }
+    if(i !== 0) {
+      blendMode(i < images.length % 2 ? EXCLUSION : OVERLAY);
+      // blendMode(OVERLAY);
+    }
+    tint(255, map(i, 0, images.length, 120, 180));
+    image(img, 0, 0, imageSize, imageSize);
   })
-
+  
   addNoise();
 }
 
@@ -244,6 +244,11 @@ function distributeError(img, x, y, errR, errG, errB, errType) {
       addError(img, 7 / 16.0, x - 1, y + 145, errR, errG, errB);
       addError(img, randOperation(errorMappedVals["3-2"], 16) , x, y + 1, errR, errG, errB);
       addError(img, 0.1 / 16.0, x + 1, y + 3, errR, errG, errB);
+    case 4:
+      addError(img, 6, x + (x < errorMappedVals["3-1"] ? randOperation(6,y/8) : randOperation(24,y/5)), y, errR, errG, errB);
+      addError(img, 3 / 16.0, x - 1, y + 1, errR, errG, errB);
+      addError(img, -5, x, y + (y > errorMappedVals["3-2"] ? 120+x/3 : errorMappedVals["3-2"]+x/50), errR, errG, errB);
+      addError(img, 1 / 16.0, x + 1, y + 1, errR, errG, errB);
   }
 }
 
@@ -261,6 +266,18 @@ function addError(img, factor, x, y, errR, errG, errB) {
   clr.setBlue(b + errB * factor);
 
   setColorAtIndex(img, x, y, clr);
+}
+
+function randOperation(a, b) {
+  switch (ditherOpIndex) {
+    case 0: return ditherOp = a << b;
+    case 1: return ditherOp = a >> b;
+    case 2: return ditherOp = a / b;
+    case 3: return ditherOp = a * b;
+    case 4: return ditherOp = a - b;
+    case 5: return ditherOp = a + b;
+    case 6: return ditherOp = a && b;
+  }
 }
 
 function gradientMap(palette, img) {
@@ -309,19 +326,11 @@ function addContrast(contrast, img) {
   img.updatePixels();
 }
 
-function addThresholdTexture(img) {
-  const ths = createGraphics(canvasSize, canvasSize);
-  ths.pixelDensity(1);
-  ths.image(img, 0, 0, canvasSize, canvasSize);
-  ths.filter(THRESHOLD, 0.1);
-  image(ths, 0, 0, canvasSize);
-}
-
 function addNoise() {
   noiseGfx = createGraphics(canvasSize, canvasSize);
   noiseGfx.pixelDensity(1);
-  noiseGfx.image(noise, 0, 0, canvasSize, canvasSize)
-  dither(noiseGfx, 1, 0)
+  noiseGfx.image(imgNoise, 0, 0, canvasSize, canvasSize)
+  // dither(noiseGfx, 1, 0)
   gradientMap(colors, noiseGfx)
   tint(255, map(seed3, 0, 1, 110, 180));
   blendMode(HARD_LIGHT);
