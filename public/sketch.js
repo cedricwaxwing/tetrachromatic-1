@@ -1,3 +1,5 @@
+// GLOBALS
+
 let seed1 = fxrand();
 let seed2 = fxrand();
 let seed3 = fxrand();
@@ -8,9 +10,10 @@ let l3 = [];
 let l4 = [];
 let noise = [];
 let images = [];
-let img1, img2, img3, img4, imgNoise;
+let img1, img2, img3, img4, imgNoise, imageSize;
 let palette_seed, colors;
 let ditherOp, ditherOpIndex, errorType, errorMappedVals;
+let begin, end, renderTime;
 let errorTypes = 5;
 let ditherOps = [
   "*",
@@ -21,9 +24,7 @@ let ditherOps = [
   "||"
 ];
 let cOff1, cOff2;
-
 const canvasSize = 1500;
-let imageSize;
 
 const assetAmounts = {
   l1: 12,
@@ -68,6 +69,7 @@ const palettes = [
 ]
 
 function preload() {
+  begin = millis();
   // ----  LOAD ASSETS ---- //
   for (i = 1; i <= assetAmounts.l1; i++) {
     l1[i] = loadImage(`gan/1/${i}.jpeg`)
@@ -125,6 +127,7 @@ function preload() {
   window.$fxhashFeatures = fxhashFeatures;
 
   console.log(fxhashFeatures)
+  begin = millis();
 }
 
 function setup() {
@@ -150,6 +153,12 @@ function setup() {
   
   addContrast(40);
   addNoise();
+  document.body.classList.add("loaded");
+  document.querySelector(".logo-wrapper").classList.add("fadeOut");
+  document.querySelector(".p5Canvas").classList.add("fadeIn");
+  end = millis();
+  renderTime = (end - begin) / 1000;
+  console.log(renderTime)
   fxpreview();
 }
 

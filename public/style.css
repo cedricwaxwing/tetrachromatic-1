@@ -1,8 +1,25 @@
 body {
-  background-color: white;
+  background-color: #F3EB20;
+  transition: background-color 0.5s ease-in;
 
   /* leave it to hide the scrollbars */
   overflow: hidden;
+}
+
+.loading-text {
+  animation: fadeOut 2s infinite alternate-reverse;
+  font-family: sans-serif;
+  font-size: 0.75rem;
+  bottom: 10%;
+  left: 50%;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  transform: translateX(-50%);
+  position: absolute;
+}
+
+.loaded {
+  background-color: #fff;
 }
 
 canvas {
@@ -16,4 +33,57 @@ canvas {
     bottom: 0;
     left: 0;
     right: 0;
+}
+
+.p5Canvas {
+  opacity: 0;
+}
+
+.logo-wrapper {
+  width: 40vmin;
+  aspect-ratio: 1/1;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%,-50%);
+}
+
+.fadeIn {
+  animation: fadeIn 0.5s ease-in forwards;
+}
+
+.fadeOut {
+  animation: fadeOut 0.25s ease-in forwards;
+}
+
+.logo {
+  animation: rotate 0.75s infinite linear;
+  width: 100%;
+}
+
+@keyframes rotate {
+  0% {
+    transform: rotate(0);
+  }
+  100% {
+    transform: rotate(359deg);
+  }
+}
+
+@keyframes fadeIn {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeOut {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
 }
