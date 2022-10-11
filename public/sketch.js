@@ -7,7 +7,7 @@ let seed = [
 let images = [];
 let image_seeds = [];
 let noise;
-let imageSize, imageOffset;
+let imageSize, imageRotation, imageOffset;
 let palette_seed, colors;
 let ditherOp, ditherOpIndex, errorType, errorMappedVals;
 let begin, end, imageLoad, renderTime;
@@ -36,12 +36,13 @@ function preload() {
     12,
     18,
     18,
-    1,
+    2
   ]
   assetAmounts.map((amount, i) => {
     let image_seed = int(map(seed[i], 0, 1, 1, assetAmounts[i]))
     image_seeds.push(image_seed);
-    if(i < 3) {
+
+    if(i !== assetAmounts.length-1) {
       images[i] = loadImage(`gan/${i+1}/${image_seed}.jpeg`)
     } else {
       noise = loadImage(`noise/${image_seed}.png`)
@@ -75,28 +76,39 @@ function preload() {
 function setup() {
   pixelDensity(2);
   colorMode(RGB)
+  angleMode(DEGREES);
   background("white");
   createCanvas(CANVAS_SIZE, CANVAS_SIZE);
   images.map((img, i) => {
     applyFilters(img, i);
   })
+  addBorder();
   render();
 }
 
 function applyFilters(img, i) {
-  if(i > 0) {
+  if(i >= 1) {
     dither(img, 1, error_seeds[i], op_seeds[i]);
   }
-  addContrast(305, img)
+  addContrast(125, img)
   if(i <= images.length-2) {
     gradientMap(colors, img);
   }
-  if(i > 0) {
-    // blendMode(OVERLAY);
-    blendMode(i < images.length % 2 ? ADD : OVERLAY);
+  addContrast(60, img)
+  if(i !== 2) {
+    push();
+    imageRotation = map(seed[i], 0, 1, 0, 270);
+    rotate(imageRotation)
+    pop();
+    tint(255, map(i, 0, images.length, 120, 210));
+    if(i > 0) {
+      blendMode(i < images.length % 2 ? EXCLUSION : OVERLAY);
+    }
+  } else {
+    tint(255, 245);
+    blendMode(OVERLAY);
   }
-  tint(255, map(i, 0, images.length, 120, 180));
-  imageSize = map(seed[i], 0, 1, CANVAS_SIZE, CANVAS_SIZE*1.8)
+  imageSize = map(seed[i], 0, 1, CANVAS_SIZE, CANVAS_SIZE*1.4)
   imageOffset = seed[i] * -(imageSize - CANVAS_SIZE)
   image(img, imageOffset, imageOffset, imageSize, imageSize);
 }
@@ -147,8 +159,27 @@ function gradientMap(palette, img) {
  img.updatePixels();
 }
 
+function addContrast(contrast, img) {
+  if(!img) {
+    img = get();
+  }
+  img.loadPixels();
+  for (let x = 0; x < img.width; x +=1) {
+    for (let y = 0; y < img.height; y +=1) {
+      let c = img.get(x,y);
+      let factor = (259 * (contrast + 255)) / (255 * (259 - contrast));
+      let nR = constrain(factor*(red(c)-128) + 128, 0, 255);
+      let nG = constrain(factor*(green(c)-128) + 128, 0, 255);
+      let nB = constrain(factor*(blue(c)-128) + 128, 0, 255);
+      
+      let nC = color(nR,nG,nB);
+      img.set(x,y,nC);
+    }
+  }
+  img.updatePixels();
+}
+
 function render() {
-  addContrast(50)
   addNoise();
   document.body.classList.add("loaded");
   document.querySelector(".logo-wrapper").classList.add("fadeOut");
@@ -167,4 +198,28 @@ function addNoise() {
   // gradientMap(colors, noiseGfx)
   tint(255, map(seed[2], 0, 1, 70, 150));
   image(noiseGfx, 0, 0, CANVAS_SIZE, CANVAS_SIZE)
+}
+
+function addBorder() {
+  noFill();
+  strokeWeight(int(map(fxrand(), 0, 1, 80, 300)))
+  stroke(round(fxrand())*255)
+  blendMode(BLEND);
+  rect(0, 0, CANVAS_SIZE, CANVAS_SIZE)
+  noStroke();
+}
+
+function addNoise() {
+  noiseGfx = createGraphics(CANVAS_SIZE, CANVAS_SIZE);
+  noiseGfx.pixelDensity(1);
+  noiseGfx.image(noise, 0, 0, CANVAS_SIZE, CANVAS_SIZE)
+  gradientMap(colors, noiseGfx)
+  tint(255, map(seed[2], 0, 1, 70, 150));
+  image(noiseGfx, 0, 0, CANVAS_SIZE, CANVAS_SIZE)
+}
+
+function keyPressed(){
+  if (key === 's'){
+    saveCanvas(`${fxhash}.jpg`);
+  }
 }
