@@ -7,7 +7,7 @@ let seed = [
 let images = [];
 let image_seeds = [];
 let noise;
-let imageSize, imageRotation, imageOffset;
+let imageSize, imageRotation, imageOffset, flipX, flipY;
 let palette_seed, colors;
 let ditherOp, ditherOpIndex, errorType, errorMappedVals;
 let begin, end, imageLoad, renderTime;
@@ -77,8 +77,10 @@ function setup() {
   pixelDensity(2);
   colorMode(RGB)
   angleMode(DEGREES);
-  background("white");
+  imageMode(CENTER);
+  rectMode(CENTER);
   createCanvas(CANVAS_SIZE, CANVAS_SIZE);
+  translate(CANVAS_SIZE/2, CANVAS_SIZE/2)
   images.map((img, i) => {
     applyFilters(img, i);
   })
@@ -87,6 +89,7 @@ function setup() {
 }
 
 function applyFilters(img, i) {
+  push();
   if(i >= 1) {
     dither(img, 1, error_seeds[i], op_seeds[i]);
   }
@@ -95,22 +98,35 @@ function applyFilters(img, i) {
     gradientMap(colors, img);
   }
   addContrast(60, img)
+  blendMode(getBlend(i));
+  flipX = Math.sign(fxrand()-0.5);
   if(i !== 2) {
-    push();
-    imageRotation = map(seed[i], 0, 1, 0, 270);
+    flipY = Math.sign(fxrand()-0.5);
+    imageRotation = floor(seed[i] * 4) * 90;
     rotate(imageRotation)
-    pop();
-    tint(255, map(i, 0, images.length, 120, 210));
-    if(i > 0) {
-      blendMode(i < images.length % 2 ? EXCLUSION : OVERLAY);
-    }
+    tint(255, map(i, 0, images.length, 160, 210));
   } else {
     tint(255, 245);
-    blendMode(OVERLAY);
+    flipY = 1;
   }
   imageSize = map(seed[i], 0, 1, CANVAS_SIZE, CANVAS_SIZE*1.4)
   imageOffset = seed[i] * -(imageSize - CANVAS_SIZE)
-  image(img, imageOffset, imageOffset, imageSize, imageSize);
+  scale(flipX,flipY);
+  image(img, 0, 0, imageSize, imageSize);
+  pop();
+}
+
+function getBlend(i) {
+  if(i !== 2) {
+    if (i < images.length % 2) {
+      return EXCLUSION
+    } else {
+      return OVERLAY
+    }
+  } else if (i != 0) {
+    const blends = [OVERLAY, SOFT_LIGHT, HARD_LIGHT];
+    return blends[round(map(fxrand(), 0, 1, 0, blends.length-1))]
+  }
 }
 
 function addContrast(contrast, img) {
@@ -195,16 +211,16 @@ function addNoise() {
   noiseGfx = createGraphics(CANVAS_SIZE, CANVAS_SIZE);
   noiseGfx.pixelDensity(1);
   noiseGfx.image(noise, 0, 0, CANVAS_SIZE, CANVAS_SIZE)
-  // gradientMap(colors, noiseGfx)
   tint(255, map(seed[2], 0, 1, 70, 150));
   image(noiseGfx, 0, 0, CANVAS_SIZE, CANVAS_SIZE)
 }
 
 function addBorder() {
+  const border = round(fxrand())*255;
   noFill();
-  strokeWeight(int(map(fxrand(), 0, 1, 80, 300)))
-  stroke(round(fxrand())*255)
-  blendMode(BLEND);
+  strokeWeight(int(map(fxrand(), 0, 1, 80, 240)))
+  stroke(border, 160)
+  blendMode(border > 0 ? ADD : MULTIPLY);
   rect(0, 0, CANVAS_SIZE, CANVAS_SIZE)
   noStroke();
 }
