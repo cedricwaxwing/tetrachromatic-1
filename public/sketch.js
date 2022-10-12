@@ -1,46 +1,40 @@
-let seed = [
-  fxrand(),
-  fxrand(),
-  fxrand(),
-  fxrand(),
-]
+let noise, imageSize, imageRatio, imageRotation, imageOffset, flipX, flipY, palette_seed, colors, errorSize, opType, begin, end, renderTime;
 let images = [];
 let image_seeds = [];
-let noise;
-let imageSize, imageRotation, imageOffset, flipX, flipY;
-let palette_seed, colors;
-let ditherOp, ditherOpIndex, errorType, errorMappedVals;
-let begin, end, imageLoad, renderTime;
-let errorTypes = 5;
+let blends = [];
+let blend_seeds = [];
 let error_seeds = [];
 let op_seeds = [];
 let ditherOps = [
   "*",
-  "/",
+  "%",
   "<<",
   ">>",
   "&&",
-  "||"
+  "||",
 ];
+const assetAmounts = [
+  12,
+  18,
+  21,
+  2
+]
 const CANVAS_SIZE = 1500;
 
 function preload() {
-  begin = millis();
+  // begin = millis();
 
   // Palette
-  palette_seed = int(map(seed[1], 0, 1, 0, palettes.length-1))
+  palette_seed = int(map(fxrand(), 0, 1, 0, palettes.length-1))
   colors = palettes[palette_seed].colors
 
   // Images
-  const assetAmounts = [
-    12,
-    18,
-    18,
-    2
-  ]
+  blends = [OVERLAY, SOFT_LIGHT, HARD_LIGHT, MULTIPLY];
   assetAmounts.map((amount, i) => {
-    let image_seed = int(map(seed[i], 0, 1, 1, assetAmounts[i]))
+    const image_seed = int(map(fxrand(), 0, 1, 1, amount))
+    const blend_seed = round(map(fxrand(), 0, 1, 0, blends.length-1))
     image_seeds.push(image_seed);
+    blend_seeds.push(blend_seed);
 
     if(i !== assetAmounts.length-1) {
       images[i] = loadImage(`gan/${i+1}/${image_seed}.jpeg`)
@@ -50,22 +44,17 @@ function preload() {
   })
 
   // Dither
-  errorMappedVals = {
-    "set-1":  map(seed[0], 0, 1, 1, 100),
-    "3-1": map(seed[1], 0, 1, 0, 3),
-    "3-2": map(seed[2], 0, 1, 16, 48),
-  }
   images.map((_, i) => {
-    error_seeds[i] = round(map(fxrand(), 0, 1, 0, errorTypes))
+    error_seeds[i] = round(map(fxrand(), 0, 1, 0, 3))
     op_seeds[i] = int(map(fxrand(), 0, 1, 0, ditherOps.length))
   })
 
   const fxhashFeatures = {
     "Palette": palettes[palette_seed].name,
-    "Dither": `•${error_seeds[1]}•${ditherOps[op_seeds[1]]}• •${error_seeds[2]}•${ditherOps[op_seeds[2]]}•`,
-    "Bio": image_seeds[0],
-    "Glyptik": image_seeds[1],
-    "Ortho": image_seeds[2],
+    "Dither": `${error_seeds[0]}${ditherOps[op_seeds[0]]}•${error_seeds[1]}${ditherOps[op_seeds[1]]}•${error_seeds[2]}${ditherOps[op_seeds[2]]}`,
+    "Bio": `${image_seeds[0]}•${blends[blend_seeds[0]].charAt(0).toUpperCase()}`,
+    "Glyptik": `${image_seeds[1]}•${blends[blend_seeds[1]].charAt(0).toUpperCase()}`,
+    "Ortho": `${image_seeds[2]}•${blends[blend_seeds[2]].charAt(0).toUpperCase()}`,
     "Electromagentism": image_seeds[3],
   }
   window.$fxhashFeatures = fxhashFeatures;
@@ -90,43 +79,29 @@ function setup() {
 
 function applyFilters(img, i) {
   push();
-  if(i >= 1) {
-    dither(img, 1, error_seeds[i], op_seeds[i]);
-  }
-  addContrast(125, img)
-  if(i <= images.length-2) {
+  errorType = error_seeds[i];
+  opType = op_seeds[i];
+  dither(img);
+  addContrast(140, img)
+  if(i !== 2) {
     gradientMap(colors, img);
   }
-  addContrast(60, img)
-  blendMode(getBlend(i));
+  blendMode(blends[blend_seeds[i]]);
   flipX = Math.sign(fxrand()-0.5);
-  if(i !== 2) {
-    flipY = Math.sign(fxrand()-0.5);
-    imageRotation = floor(seed[i] * 4) * 90;
-    rotate(imageRotation)
-    tint(255, map(i, 0, images.length, 160, 210));
-  } else {
-    tint(255, 245);
+  if(i === 2) {
     flipY = 1;
+  } else {
+    flipY = Math.sign(fxrand()-0.5);
+    imageRotation = floor(fxrand() * 4) * 90;
+    rotate(imageRotation)
   }
-  imageSize = map(seed[i], 0, 1, CANVAS_SIZE, CANVAS_SIZE*1.4)
-  imageOffset = seed[i] * -(imageSize - CANVAS_SIZE)
+  tint(255, map(i, 0, images.length, 190, 250));
+  imageRatio = map(fxrand(), 0, 1, 1, 1.5)
+  imageSize = map(fxrand(), 0, 1, CANVAS_SIZE, CANVAS_SIZE*imageRatio)
+  imageOffset = fxrand() * -(imageSize - CANVAS_SIZE)
   scale(flipX,flipY);
   image(img, 0, 0, imageSize, imageSize);
   pop();
-}
-
-function getBlend(i) {
-  if(i !== 2) {
-    if (i < images.length % 2) {
-      return EXCLUSION
-    } else {
-      return OVERLAY
-    }
-  } else if (i != 0) {
-    const blends = [OVERLAY, SOFT_LIGHT, HARD_LIGHT];
-    return blends[round(map(fxrand(), 0, 1, 0, blends.length-1))]
-  }
 }
 
 function addContrast(contrast, img) {
@@ -175,52 +150,31 @@ function gradientMap(palette, img) {
  img.updatePixels();
 }
 
-function addContrast(contrast, img) {
-  if(!img) {
-    img = get();
-  }
-  img.loadPixels();
-  for (let x = 0; x < img.width; x +=1) {
-    for (let y = 0; y < img.height; y +=1) {
-      let c = img.get(x,y);
-      let factor = (259 * (contrast + 255)) / (255 * (259 - contrast));
-      let nR = constrain(factor*(red(c)-128) + 128, 0, 255);
-      let nG = constrain(factor*(green(c)-128) + 128, 0, 255);
-      let nB = constrain(factor*(blue(c)-128) + 128, 0, 255);
-      
-      let nC = color(nR,nG,nB);
-      img.set(x,y,nC);
-    }
-  }
-  img.updatePixels();
-}
-
 function render() {
   addNoise();
   document.body.classList.add("loaded");
   document.querySelector(".logo-wrapper").classList.add("fadeOut");
   document.querySelector(".p5Canvas").classList.add("fadeIn");
-  end = millis();
-  renderTime = (end - begin) / 1000;
-  console.log(renderTime)
+  // end = millis();
+  // renderTime = (end - begin) / 1000;
+  // console.log(renderTime)
   fxpreview();
 }
 
 function addNoise() {
   blendMode(HARD_LIGHT);
   noiseGfx = createGraphics(CANVAS_SIZE, CANVAS_SIZE);
-  noiseGfx.pixelDensity(1);
+  noiseGfx.pixelDensity(2);
   noiseGfx.image(noise, 0, 0, CANVAS_SIZE, CANVAS_SIZE)
-  tint(255, map(seed[2], 0, 1, 70, 150));
+  tint(255, map(fxrand(), 0, 1, 70, 250));
   image(noiseGfx, 0, 0, CANVAS_SIZE, CANVAS_SIZE)
 }
 
 function addBorder() {
-  const border = round(fxrand())*255;
   noFill();
   strokeWeight(int(map(fxrand(), 0, 1, 80, 240)))
-  stroke(border, 160)
-  blendMode(border > 0 ? ADD : MULTIPLY);
+  stroke(255, 190)
+  blendMode(ADD);
   rect(0, 0, CANVAS_SIZE, CANVAS_SIZE)
   noStroke();
 }
@@ -230,7 +184,7 @@ function addNoise() {
   noiseGfx.pixelDensity(1);
   noiseGfx.image(noise, 0, 0, CANVAS_SIZE, CANVAS_SIZE)
   gradientMap(colors, noiseGfx)
-  tint(255, map(seed[2], 0, 1, 70, 150));
+  tint(255, map(fxrand(), 0, 1, 70, 150));
   image(noiseGfx, 0, 0, CANVAS_SIZE, CANVAS_SIZE)
 }
 
