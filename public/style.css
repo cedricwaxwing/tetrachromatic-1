@@ -59,6 +59,68 @@ canvas {
 .logo {
   animation: rotate 0.75s infinite linear;
   width: 100%;
+  aspect-ratio: 1/1;
+  position: relative;
+}
+
+.logo-1 {
+  background-color: #ffffff;
+  border-radius: 9999px;
+  inset: 0%;
+  position: absolute;
+}
+
+.logo-2 {
+  background-color: #F3EB20;
+  border-radius: 9999px;
+  border: 1.67vmin solid #403c43;
+  position: absolute;
+  inset: 8%;
+}
+
+.logo-3 {
+  border-radius: 50% 45%;
+  border: 1.67vmin solid #403c43;
+  position: absolute;
+  transform-origin: center;
+  transform: rotate(45deg);
+  inset: 16%;
+}
+
+.logo-4 {
+  border-radius: 50% 38%;
+  border: 1.67vmin solid #403c43;
+  position: absolute;
+  transform-origin: center;
+  transform: rotate(45deg);
+  inset: 24%;
+}
+
+.logo-5 {
+  background-color: #ffffff;
+  border-radius: 50% 33%;
+  border: 1.67vmin solid #403c43;
+  position: absolute;
+  transform-origin: center;
+  transform: rotate(45deg);
+  inset: 32%;
+}
+.logo-6 {
+  border-radius: 9999px;
+  border: 1.67vmin solid #403c43;
+  position: absolute;
+  inset: 40%;
+}
+
+.logo-7 {
+  background-color: #403c43;
+  border-radius: 9999px;
+  position: absolute;
+  inset: 46%;
+}
+
+.logo-svg {
+  width: 100%;
 }
 
 @keyframes rotate {

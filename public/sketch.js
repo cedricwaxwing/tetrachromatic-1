@@ -1,4 +1,14 @@
-let noise, imageSize, imageRatio, imageRotation, imageOffset, flipX, flipY, palette_seed, colors, errorSize, opType, begin, end, renderTime;
+// "TETRACHROMA"
+// Launched October 21, 2022 on https://fxhash.xyz
+// BIRD VISION • https://www.birdvision.xyz
+
+// Copyright (©) 2022 Bird Vision
+
+// Licensed under CC BY-NC-SA 4.0
+// "This work is licensed under the Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License.
+// To view a copy of this license, visit http://creativecommons.org/licenses/by-nc-sa/4.0/ or send a letter to Creative Commons, PO Box 1866, Mountain View, CA 94042, USA."
+
+let noise, imageSize, imageRatio, imageRotation, imageOffset, flipX, flipY, palette_seed, colors, errorAmount, opType, begin, end, renderTime, border;
 let images = [];
 let image_seeds = [];
 let blends = [];
@@ -22,14 +32,14 @@ const assetAmounts = [
 const CANVAS_SIZE = 1500;
 
 function preload() {
-  // begin = millis();
+  begin = millis();
 
-  // Palette
+  // Palette Seeds
   palette_seed = int(map(fxrand(), 0, 1, 0, palettes.length-1))
   colors = palettes[palette_seed].colors
 
-  // Images
-  blends = [OVERLAY, SOFT_LIGHT, HARD_LIGHT, MULTIPLY];
+  // Images Seeds
+  blends = [OVERLAY, SOFT_LIGHT, HARD_LIGHT];
   assetAmounts.map((amount, i) => {
     const image_seed = int(map(fxrand(), 0, 1, 1, amount))
     const blend_seed = round(map(fxrand(), 0, 1, 0, blends.length-1))
@@ -43,12 +53,13 @@ function preload() {
     }
   })
 
-  // Dither
+  // Dither Seeds
   images.map((_, i) => {
-    error_seeds[i] = round(map(fxrand(), 0, 1, 0, 3))
+    error_seeds[i] = round(map(fxrand(), 0, 1, 1, 3))
     op_seeds[i] = int(map(fxrand(), 0, 1, 0, ditherOps.length))
   })
 
+  // fxHash Features
   const fxhashFeatures = {
     "Palette": palettes[palette_seed].name,
     "Dither": `${error_seeds[0]}${ditherOps[op_seeds[0]]}•${error_seeds[1]}${ditherOps[op_seeds[1]]}•${error_seeds[2]}${ditherOps[op_seeds[2]]}`,
@@ -58,7 +69,6 @@ function preload() {
     "Electromagentism": image_seeds[3],
   }
   window.$fxhashFeatures = fxhashFeatures;
-
   console.log(fxhashFeatures)
 }
 
@@ -70,6 +80,10 @@ function setup() {
   rectMode(CENTER);
   createCanvas(CANVAS_SIZE, CANVAS_SIZE);
   translate(CANVAS_SIZE/2, CANVAS_SIZE/2)
+
+  // Loop through each gan image and apply appropriate dithering,
+  // gradient mapping, blend modes, and contrast.
+  // Also, apply resizing, flips, and rotations.
   images.map((img, i) => {
     applyFilters(img, i);
   })
@@ -79,31 +93,57 @@ function setup() {
 
 function applyFilters(img, i) {
   push();
-  errorType = error_seeds[i];
+  errorAmount = error_seeds[i];
   opType = op_seeds[i];
+
+  // Filters, Modulations and Adjustments
+  addContrast(90, img)
   dither(img);
-  addContrast(140, img)
-  if(i !== 2) {
-    gradientMap(colors, img);
+  addContrast(120, img)
+  gradientMap(colors, img);
+
+  // Blend magic time
+  if ( i % 2 === 0 ) {
+    blendMode(DIFFERENCE);
+  } else {
+    blendMode(blends[blend_seeds[i]]);
   }
-  blendMode(blends[blend_seeds[i]]);
-  flipX = Math.sign(fxrand()-0.5);
-  if(i === 2) {
+
+  // Flips - we don't want to flip the birds vertically
+  if( i === 2) {
     flipY = 1;
   } else {
     flipY = Math.sign(fxrand()-0.5);
     imageRotation = floor(fxrand() * 4) * 90;
     rotate(imageRotation)
   }
-  tint(255, map(i, 0, images.length, 190, 250));
-  imageRatio = map(fxrand(), 0, 1, 1, 1.5)
+  flipX = Math.sign(fxrand()-0.5);
+  scale(flipX,flipY);
+
+  // Resizing
+  imageRatio = map(fxrand(), 0, 1, 1, 1.45)
   imageSize = map(fxrand(), 0, 1, CANVAS_SIZE, CANVAS_SIZE*imageRatio)
   imageOffset = fxrand() * -(imageSize - CANVAS_SIZE)
-  scale(flipX,flipY);
+
+
+  // Opacity
+  tint(255, map(i, 0, images.length-1, 160, 255));
+
+  // Render layer
   image(img, 0, 0, imageSize, imageSize);
+
+  if(i === 2) {
+    blendMode(blends[blend_seeds[i]]);
+    tint(255, 230);
+    image(img, 0, 0, imageSize, imageSize);
+  }
   pop();
 }
 
+
+// Modified version of cassie's contrast algo found on p5 here:
+// https://editor.p5js.org/cassie/sketches/SB4pBjns0
+// 🙏
 function addContrast(contrast, img) {
   if(!img) {
     img = get();
@@ -155,25 +195,16 @@ function render() {
   document.body.classList.add("loaded");
   document.querySelector(".logo-wrapper").classList.add("fadeOut");
   document.querySelector(".p5Canvas").classList.add("fadeIn");
-  // end = millis();
-  // renderTime = (end - begin) / 1000;
-  // console.log(renderTime)
+  end = millis();
+  renderTime = (end - begin) / 1000;
+  console.log(renderTime)
   fxpreview();
-}
-
-function addNoise() {
-  blendMode(HARD_LIGHT);
-  noiseGfx = createGraphics(CANVAS_SIZE, CANVAS_SIZE);
-  noiseGfx.pixelDensity(2);
-  noiseGfx.image(noise, 0, 0, CANVAS_SIZE, CANVAS_SIZE)
-  tint(255, map(fxrand(), 0, 1, 70, 250));
-  image(noiseGfx, 0, 0, CANVAS_SIZE, CANVAS_SIZE)
 }
 
 function addBorder() {
   noFill();
-  strokeWeight(int(map(fxrand(), 0, 1, 80, 240)))
-  stroke(255, 190)
+  strokeWeight(int(map(fxrand(), 0, 1, 40, 90)))
+  stroke(255, 230)
   blendMode(ADD);
   rect(0, 0, CANVAS_SIZE, CANVAS_SIZE)
   noStroke();
@@ -184,7 +215,8 @@ function addNoise() {
   noiseGfx.pixelDensity(1);
   noiseGfx.image(noise, 0, 0, CANVAS_SIZE, CANVAS_SIZE)
   gradientMap(colors, noiseGfx)
-  tint(255, map(fxrand(), 0, 1, 70, 150));
+  blendMode(HARD_LIGHT)
+  tint(255, map(fxrand(), 0, 1, 70, 120));
   image(noiseGfx, 0, 0, CANVAS_SIZE, CANVAS_SIZE)
 }
 
